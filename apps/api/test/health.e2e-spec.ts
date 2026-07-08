@@ -1,0 +1,33 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import { healthResponseSchema } from '@munichat/shared';
+import { AppModule } from './../src/app.module';
+
+describe('Health (e2e)', () => {
+  let app: INestApplication<App>;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  it('/health (GET) reports ok with a live database connection', () => {
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect((res) => {
+        const body = healthResponseSchema.parse(res.body);
+        expect(body.status).toBe('ok');
+      });
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+});

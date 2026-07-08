@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  adObjectGuid String    @unique
+  username     String    @unique
+  displayName  String
+  email        String?
+  department   String?
+  avatarUrl    String?
+  isActive     Boolean   @default(true)
+  lastSeenAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  memberships ChannelMember[]
+  messages    Message[]
+  tickets     TicketRef[]
+}
+
+model Channel {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  displayName String
+  type        ChannelType
+  adGroupDn   String?     @unique
+  createdAt   DateTime    @default(now())
+
+  members  ChannelMember[]
+  messages Message[]
+}
+
+enum ChannelType {
+  DEPARTMENT
+  GENERAL
+  GROUP
+  DM
+}
+
+model ChannelMember {
+  userId            String
+  channelId         String
+  role              MemberRole @default(MEMBER)
+  joinedAt          DateTime   @default(now())
+  lastReadMessageId String?
+
+  user    User    @relation(fields: [userId], references: [id])
+  channel Channel @relation(fields: [channelId], references: [id])
+
+  @@id([userId, channelId])
+}
+
+enum MemberRole {
+  MEMBER
+  ADMIN
+}
+
+model Message {
+  id        String      @id @default(uuid())
+  channelId String
+  authorId  String
+  content   String
+  type      MessageType @default(TEXT)
+  replyToId String?
+  editedAt  DateTime?
+  deletedAt DateTime?
+  createdAt DateTime    @default(now())
+
+  channel     Channel      @relation(fields: [channelId], references: [id])
+  author      User         @relation(fields: [authorId], references: [id])
+  attachments Attachment[]
+  linkPreview LinkPreview?
+  ticketRef   TicketRef?
+
+  @@index([channelId, createdAt])
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  SYSTEM
+  TICKET
+}
+
+model Attachment {
+  id        String @id @default(uuid())
+  messageId String
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  objectKey String
+
+  message Message @relation(fields: [messageId], references: [id])
+}
+
+model LinkPreview {
+  id          String  @id @default(uuid())
+  messageId   String  @unique
+  url         String
+  title       String?
+  description String?
+  imageUrl    String?
+
+  message Message @relation(fields: [messageId], references: [id])
+}
+
+model TicketRef {
+  id           String   @id @default(uuid())
+  messageId    String   @unique
+  glpiTicketId Int
+  status       String
+  createdById  String
+  createdAt    DateTime @default(now())
+
+  message   Message @relation(fields: [messageId], references: [id])
+  createdBy User    @relation(fields: [createdById], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  metadata  Json?
+  ip        String?
+  createdAt DateTime @default(now())
+}
