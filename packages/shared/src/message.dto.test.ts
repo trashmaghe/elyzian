@@ -16,6 +16,7 @@ const baseMessage = {
   author: validAuthor,
   attachments: [],
   linkPreview: null,
+  ticketRef: null,
   replyTo: null,
 };
 
@@ -42,6 +43,21 @@ describe('messageSchema', () => {
     expect(result.attachments).toHaveLength(1);
     expect(result.linkPreview?.status).toBe('READY');
     expect(result.replyTo?.authorDisplayName).toBe('Maria Ferreira');
+  });
+
+  it('accepts a ticket message with a populated ticketRef', () => {
+    const result = messageSchema.parse({
+      ...baseMessage,
+      type: 'TICKET',
+      ticketRef: {
+        glpiTicketId: 42,
+        status: 'New',
+        url: 'https://glpi.example.com/front/ticket.form.php?id=42',
+        createdAt: '2026-07-10T00:00:00.000Z',
+        updatedAt: '2026-07-10T00:00:00.000Z',
+      },
+    });
+    expect(result.ticketRef?.glpiTicketId).toBe(42);
   });
 
   it('rejects an invalid message type', () => {

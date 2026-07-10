@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Download, Pencil, Reply, Trash2 } from 'lucide-react';
+import { Download, ExternalLink, Pencil, Reply, Trash2 } from 'lucide-react';
 import type { Message } from '@munichat/shared';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +18,19 @@ import {
 
 function attachmentUrl(attachmentId: string): string {
   return `${import.meta.env.VITE_API_URL}/files/${attachmentId}`;
+}
+
+const TICKET_STATUS_STYLES: Record<string, string> = {
+  New: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+  Processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+  Pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  Approval: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  Solved: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+  Closed: 'bg-muted text-muted-foreground',
+};
+
+function ticketStatusClass(status: string): string {
+  return TICKET_STATUS_STYLES[status] ?? 'bg-muted text-muted-foreground';
 }
 
 export function MessageItem({
@@ -134,6 +148,35 @@ export function MessageItem({
             )}
           </div>
         </a>
+      )}
+
+      {message.type === 'TICKET' && message.ticketRef && (
+        <Card size="sm" className="max-w-sm">
+          <CardHeader>
+            <CardTitle>Ticket #{message.ticketRef.glpiTicketId}</CardTitle>
+            <CardAction>
+              <span
+                className={cn(
+                  'rounded-full px-2 py-0.5 text-xs font-medium',
+                  ticketStatusClass(message.ticketRef.status),
+                )}
+              >
+                {message.ticketRef.status}
+              </span>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <a
+              href={message.ticketRef.url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              View in GLPI
+              <ExternalLink className="size-3.5" />
+            </a>
+          </CardContent>
+        </Card>
       )}
 
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { Server } from 'socket.io';
 import { SocketEvent } from '@munichat/shared';
 import { ChatGateway } from './chat.gateway';
@@ -64,6 +65,7 @@ describe('ChatGateway', () => {
       author,
       attachments: [],
       linkPreview: null,
+      ticketRef: null,
       replyTo: null,
       ...overrides,
     };
@@ -90,6 +92,10 @@ describe('ChatGateway', () => {
         { provide: ChannelsService, useValue: channelsService },
         { provide: MessagesService, useValue: messagesService },
         { provide: PresenceService, useValue: presenceService },
+        {
+          provide: ConfigService,
+          useValue: { get: () => 'https://glpi.example.com' },
+        },
       ],
     }).compile();
 

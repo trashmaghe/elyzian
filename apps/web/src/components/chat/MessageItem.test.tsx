@@ -20,6 +20,7 @@ function buildMessage(overrides: Partial<Message> = {}): Message {
     author,
     attachments: [],
     linkPreview: null,
+    ticketRef: null,
     replyTo: null,
     ...overrides,
   };
@@ -82,6 +83,33 @@ describe('MessageItem', () => {
     );
     expect(screen.getByLabelText('Edit')).toBeInTheDocument();
     expect(screen.getByLabelText('Delete')).toBeInTheDocument();
+  });
+
+  it('renders a ticket card with status and GLPI link for TICKET messages', () => {
+    render(
+      <MessageItem
+        message={buildMessage({
+          type: 'TICKET',
+          content: 'printer on 3rd floor is jammed',
+          ticketRef: {
+            glpiTicketId: 42,
+            status: 'New',
+            url: 'https://glpi.example.com/front/ticket.form.php?id=42',
+            createdAt: '2026-07-10T00:00:00.000Z',
+            updatedAt: '2026-07-10T00:00:00.000Z',
+          },
+        })}
+        isOwn={false}
+        onReply={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Ticket #42')).toBeInTheDocument();
+    expect(screen.getByText('New')).toBeInTheDocument();
+    const link = screen.getByText('View in GLPI').closest('a');
+    expect(link).toHaveAttribute('href', 'https://glpi.example.com/front/ticket.form.php?id=42');
   });
 
   it('calls onReply immediately but requires confirmation before calling onDelete', async () => {

@@ -3,6 +3,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { MessagesService } from './messages.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { FilesService } from '../files/files.service';
+import { GlpiService, GlpiUnavailableError } from '../glpi/glpi.service';
 import { QUEUE_NAMES } from '../queue/queue-names';
 import { decodeCursor, encodeCursor } from './message-response.mapper';
 
@@ -10,6 +11,7 @@ const MESSAGE_INCLUDE = {
   author: true,
   attachments: true,
   linkPreview: true,
+  ticketRef: true,
   replyTo: { include: { author: true, attachments: true } },
 };
 
@@ -22,8 +24,12 @@ describe('MessagesService', () => {
       update: jest.Mock;
       findUnique: jest.Mock;
     };
+    user: {
+      findUniqueOrThrow: jest.Mock;
+    };
   };
   let filesService: { getRealObjectSize: jest.Mock };
+  let glpiService: { createTicket: jest.Mock };
   let queue: { add: jest.Mock };
 
   const author = {
@@ -72,8 +78,12 @@ describe('MessagesService', () => {
         update: jest.fn(),
         findUnique: jest.fn(),
       },
+      user: {
+        findUniqueOrThrow: jest.fn(),
+      },
     };
     filesService = { getRealObjectSize: jest.fn() };
+    glpiService = { createTicket: jest.fn() };
     queue = { add: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -81,6 +91,7 @@ describe('MessagesService', () => {
         MessagesService,
         { provide: PrismaService, useValue: prisma },
         { provide: FilesService, useValue: filesService },
+        { provide: GlpiService, useValue: glpiService },
         { provide: getQueueToken(QUEUE_NAMES.LINK_PREVIEW), useValue: queue },
       ],
     }).compile();
@@ -294,6 +305,90 @@ describe('MessagesService', () => {
       });
 
       expect(result).toEqual({ error: 'Attachment was not found in storage' });
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('create /ticket', () => {
+    it('creates a GLPI ticket and persists a TICKET message on success', async () => {
+      prisma.user.findUniqueOrThrow.mockResolvedValue(author);
+      glpiService.createTicket.mockResolvedValue({
+        glpiTicketId: 42,
+        status: 'New',
+      });
+      const created = buildMessage('m1', '2026-07-10T00:00:01.000Z', {
+        type: 'TICKET',
+        content: 'printer on 3rd floor is jammed',
+      });
+      prisma.message.create.mockResolvedValue(created);
+
+      const result = await service.create({
+        channelId: 'channel-1',
+        authorId: 'user-1',
+        content: '/ticket printer on 3rd floor is jammed',
+      });
+
+      expect(result).toEqual({ message: created });
+      expect(glpiService.createTicket).toHaveBeenCalledWith({
+        title: 'printer on 3rd floor is jammed',
+        content: 'printer on 3rd floor is jammed',
+        requesterLabel: 'Reported via MuniChat by Joao Silva (jsilva)',
+      });
+      expect(prisma.message.create).toHaveBeenCalledWith({
+        data: {
+          channelId: 'channel-1',
+          authorId: 'user-1',
+          content: 'printer on 3rd floor is jammed',
+          type: 'TICKET',
+          ticketRef: {
+            create: {
+              glpiTicketId: 42,
+              status: 'New',
+              createdById: 'user-1',
+            },
+          },
+        },
+        include: MESSAGE_INCLUDE,
+      });
+    });
+
+    it('rejects a bare /ticket with no description without calling GLPI', async () => {
+      const result = await service.create({
+        channelId: 'channel-1',
+        authorId: 'user-1',
+        content: '/ticket',
+      });
+
+      expect(result).toEqual({ error: 'Ticket description cannot be empty' });
+      expect(glpiService.createTicket).not.toHaveBeenCalled();
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects /ticket with only whitespace after it', async () => {
+      const result = await service.create({
+        channelId: 'channel-1',
+        authorId: 'user-1',
+        content: '/ticket    ',
+      });
+
+      expect(result).toEqual({ error: 'Ticket description cannot be empty' });
+      expect(glpiService.createTicket).not.toHaveBeenCalled();
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
+
+    it('persists nothing when GLPI is unreachable', async () => {
+      prisma.user.findUniqueOrThrow.mockResolvedValue(author);
+      glpiService.createTicket.mockRejectedValue(new GlpiUnavailableError());
+
+      const result = await service.create({
+        channelId: 'channel-1',
+        authorId: 'user-1',
+        content: '/ticket printer on 3rd floor is jammed',
+      });
+
+      expect(result).toEqual({
+        error: 'GLPI is unreachable. Please try again later.',
+      });
       expect(prisma.message.create).not.toHaveBeenCalled();
     });
   });

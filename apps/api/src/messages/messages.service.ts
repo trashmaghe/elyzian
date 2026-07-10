@@ -5,6 +5,7 @@ import { MessageType } from '@prisma/client';
 import { PendingAttachment } from '@munichat/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { FilesService } from '../files/files.service';
+import { GlpiService, GlpiUnavailableError } from '../glpi/glpi.service';
 import { LinkPreviewJobData, QUEUE_NAMES } from '../queue/queue-names';
 import {
   decodeCursor,
@@ -13,11 +14,14 @@ import {
 } from './message-response.mapper';
 
 const URL_PATTERN = /https?:\/\/\S+/i;
+const TICKET_PREFIX_PATTERN = /^\/ticket(?:\s+([\s\S]*))?$/i;
+const TICKET_TITLE_MAX_LENGTH = 80;
 
 const MESSAGE_INCLUDE = {
   author: true,
   attachments: true,
   linkPreview: true,
+  ticketRef: true,
   replyTo: { include: { author: true, attachments: true } },
 } as const;
 
@@ -47,6 +51,7 @@ export class MessagesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly filesService: FilesService,
+    private readonly glpiService: GlpiService,
     @InjectQueue(QUEUE_NAMES.LINK_PREVIEW)
     private readonly linkPreviewQueue: Queue<LinkPreviewJobData>,
   ) {}
@@ -95,6 +100,15 @@ export class MessagesService {
     replyToId,
     attachments,
   }: CreateMessageInput): Promise<CreateMessageResult> {
+    const ticketMatch = TICKET_PREFIX_PATTERN.exec(content);
+    if (ticketMatch) {
+      return this.createTicketMessage(
+        channelId,
+        authorId,
+        (ticketMatch[1] ?? '').trim(),
+      );
+    }
+
     for (const attachment of attachments ?? []) {
       const realSize = await this.filesService.getRealObjectSize(
         attachment.objectKey,
@@ -147,6 +161,53 @@ export class MessagesService {
         },
       );
     }
+
+    return { message };
+  }
+
+  private async createTicketMessage(
+    channelId: string,
+    authorId: string,
+    description: string,
+  ): Promise<CreateMessageResult> {
+    if (!description) {
+      return { error: 'Ticket description cannot be empty' };
+    }
+
+    const author = await this.prisma.user.findUniqueOrThrow({
+      where: { id: authorId },
+    });
+
+    let ticket: { glpiTicketId: number; status: string };
+    try {
+      ticket = await this.glpiService.createTicket({
+        title: description.slice(0, TICKET_TITLE_MAX_LENGTH),
+        content: description,
+        requesterLabel: `Reported via MuniChat by ${author.displayName} (${author.username})`,
+      });
+    } catch (err) {
+      if (err instanceof GlpiUnavailableError) {
+        return { error: 'GLPI is unreachable. Please try again later.' };
+      }
+      throw err;
+    }
+
+    const message = await this.prisma.message.create({
+      data: {
+        channelId,
+        authorId,
+        content: description,
+        type: MessageType.TICKET,
+        ticketRef: {
+          create: {
+            glpiTicketId: ticket.glpiTicketId,
+            status: ticket.status,
+            createdById: authorId,
+          },
+        },
+      },
+      include: MESSAGE_INCLUDE,
+    });
 
     return { message };
   }

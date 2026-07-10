@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { MessagesController } from './messages.controller';
 import { MessagesService } from './messages.service';
 import { ChannelsService } from '../channels/channels.service';
@@ -34,6 +35,10 @@ describe('MessagesController', () => {
       providers: [
         { provide: ChannelsService, useValue: channelsService },
         { provide: MessagesService, useValue: messagesService },
+        {
+          provide: ConfigService,
+          useValue: { get: () => 'https://glpi.example.com' },
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -69,6 +74,7 @@ describe('MessagesController', () => {
           author: user,
           attachments: [],
           linkPreview: null,
+          ticketRef: null,
           replyTo: null,
         },
       ],
@@ -100,6 +106,7 @@ describe('MessagesController', () => {
           },
           attachments: [],
           linkPreview: null,
+          ticketRef: null,
           replyTo: null,
         },
       ],

@@ -24,6 +24,7 @@ function buildMessage(id: string, content: string, createdAt: string) {
     author,
     attachments: [],
     linkPreview: null,
+    ticketRef: null,
     replyTo: null,
   };
 }

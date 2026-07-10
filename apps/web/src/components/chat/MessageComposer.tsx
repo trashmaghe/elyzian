@@ -70,8 +70,8 @@ export function MessageComposer({
       }
       setContent('');
       setPendingFile(null);
-    } catch {
-      setError('Failed to send message. Please try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send message. Please try again.');
     } finally {
       setIsSending(false);
     }
@@ -173,7 +173,7 @@ export function MessageComposer({
           value={content}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Message…"
+          placeholder="Message… (try /ticket <description> to open a GLPI ticket)"
           rows={1}
           className="flex-1 resize-none rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
