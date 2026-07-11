@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
 import { LinkPreviewStatus } from '@prisma/client';
 import { SocketEvent } from '@munichat/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,12 +14,16 @@ import { parseOgTags } from './link-preview.parser';
 
 @Processor(QUEUE_NAMES.LINK_PREVIEW)
 export class LinkPreviewProcessor extends WorkerHost {
+  private readonly glpiUrl: string;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly messagesService: MessagesService,
     private readonly chatGateway: ChatGateway,
+    configService: ConfigService,
   ) {
     super();
+    this.glpiUrl = configService.get<string>('GLPI_URL')!;
   }
 
   async process(job: Job<LinkPreviewJobData>): Promise<void> {
@@ -64,7 +69,7 @@ export class LinkPreviewProcessor extends WorkerHost {
     if (!message) {
       return;
     }
-    const dto = toMessageDto(message);
+    const dto = toMessageDto(message, this.glpiUrl);
     this.chatGateway.server
       .to(channelRoom(channelId))
       .emit(SocketEvent.MESSAGE_UPDATED, dto);

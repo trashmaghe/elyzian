@@ -2,6 +2,7 @@ import {
   Attachment as AttachmentModel,
   LinkPreview as LinkPreviewModel,
   Message as MessageModel,
+  TicketRef as TicketRefModel,
   User,
 } from '@prisma/client';
 import {
@@ -20,6 +21,7 @@ export type MessageWithExtras = MessageModel & {
   author: User;
   attachments: AttachmentModel[];
   linkPreview: LinkPreviewModel | null;
+  ticketRef: TicketRefModel | null;
   replyTo: ReplyToMessage | null;
 };
 
@@ -44,7 +46,10 @@ export function toReplyPreview(replyTo: ReplyToMessage): ReplyPreview {
   };
 }
 
-export function toMessageDto(message: MessageWithExtras): MessageDto {
+export function toMessageDto(
+  message: MessageWithExtras,
+  glpiUrl: string,
+): MessageDto {
   const deleted = message.deletedAt !== null;
 
   return {
@@ -70,6 +75,16 @@ export function toMessageDto(message: MessageWithExtras): MessageDto {
             status: message.linkPreview.status,
           }
         : null,
+    ticketRef:
+      deleted || !message.ticketRef
+        ? null
+        : {
+            glpiTicketId: message.ticketRef.glpiTicketId,
+            status: message.ticketRef.status,
+            url: `${glpiUrl}/front/ticket.form.php?id=${message.ticketRef.glpiTicketId}`,
+            createdAt: message.ticketRef.createdAt.toISOString(),
+            updatedAt: message.ticketRef.updatedAt.toISOString(),
+          },
     replyTo: message.replyTo ? toReplyPreview(message.replyTo) : null,
   };
 }

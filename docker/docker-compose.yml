@@ -69,16 +69,24 @@ services:
       LDAP_ORGANISATION: MuniChat
       LDAP_DOMAIN: munichat.local
       LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD}
+      LDAP_CONFIG_PASSWORD: ${LDAP_ADMIN_PASSWORD}
       LDAP_TLS: "false"
-      LDAP_ENABLE_MEMBEROF: "true"
     ports:
       - "${LDAP_PORT}:389"
     volumes:
       - ldap_data:/var/lib/ldap
       - ldap_config:/etc/ldap/slapd.d
+      # Applied in filename order: this one first (fixes the image's default
+      # memberOf overlay, which watches groupOfUniqueNames/uniqueMember, to
+      # instead watch groupOfNames/member - matching both bootstrap.ldif's
+      # groups and real Active Directory's own semantics), then the actual
+      # seed data - order matters, since memberOf is computed at write time.
+      - ../docker/ldap/memberof-override.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/10-memberof-override.ldif:ro
       - ../docker/ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-bootstrap.ldif:ro
     healthcheck:
-      test: ["CMD", "ldapsearch", "-x", "-H", "ldap://localhost", "-b", "dc=munichat,dc=local"]
+      # rootDSE, not our own base DN: that DN doesn't exist yet on a container's
+      # very first boot, before the custom bootstrap ldifs above have applied.
+      test: ["CMD", "ldapsearch", "-x", "-H", "ldap://localhost", "-s", "base", "-b", "", "(objectclass=*)"]
       interval: 5s
       timeout: 5s
       retries: 10

@@ -12,6 +12,7 @@ import { MessagesModule } from './messages/messages.module';
 import { ChatModule } from './chat/chat.module';
 import { FilesModule } from './files/files.module';
 import { LinkPreviewModule } from './link-preview/link-preview.module';
+import { GlpiWebhookModule } from './glpi/glpi-webhook.module';
 import { createBullConnection } from './queue/bullmq-connection';
 
 @Module({
@@ -31,6 +32,7 @@ import { createBullConnection } from './queue/bullmq-connection';
     ChatModule,
     FilesModule,
     LinkPreviewModule,
+    GlpiWebhookModule,
   ],
 })
 export class AppModule {}

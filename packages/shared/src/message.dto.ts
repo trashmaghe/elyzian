@@ -3,6 +3,7 @@ import { MessageType } from './enums';
 import { userSummarySchema } from './user.dto';
 import { attachmentSchema, pendingAttachmentSchema } from './attachment.dto';
 import { linkPreviewSchema } from './link-preview.dto';
+import { ticketRefSchema } from './ticket-ref.dto';
 
 export const replyPreviewSchema = z.object({
   id: z.string(),
@@ -28,6 +29,7 @@ export const messageSchema = z.object({
   author: userSummarySchema,
   attachments: z.array(attachmentSchema),
   linkPreview: linkPreviewSchema.nullable(),
+  ticketRef: ticketRefSchema.nullable(),
   replyTo: replyPreviewSchema.nullable(),
 });
 

@@ -129,9 +129,12 @@ model TicketRef {
   status       String
   createdById  String
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   message   Message @relation(fields: [messageId], references: [id])
   createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([glpiTicketId])
 }
 
 model AuditLog {

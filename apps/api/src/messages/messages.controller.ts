@@ -7,6 +7,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { User } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 import type { MessageHistoryResponse } from '@munichat/shared';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -18,10 +19,15 @@ import { toMessageDto } from './message-response.mapper';
 @Controller('channels/:channelId/messages')
 @UseGuards(JwtAuthGuard)
 export class MessagesController {
+  private readonly glpiUrl: string;
+
   constructor(
     private readonly channelsService: ChannelsService,
     private readonly messagesService: MessagesService,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.glpiUrl = configService.get<string>('GLPI_URL')!;
+  }
 
   @Get()
   async getHistory(
@@ -40,6 +46,9 @@ export class MessagesController {
         limit: query.limit,
       },
     );
-    return { messages: messages.map(toMessageDto), nextCursor };
+    return {
+      messages: messages.map((message) => toMessageDto(message, this.glpiUrl)),
+      nextCursor,
+    };
   }
 }

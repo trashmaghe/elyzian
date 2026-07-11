@@ -22,6 +22,7 @@ import {
   typingClientPayloadSchema,
 } from '@munichat/shared';
 import { Server, Socket } from 'socket.io';
+import { ConfigService } from '@nestjs/config';
 import { ChannelsService } from '../channels/channels.service';
 import { MessagesService } from '../messages/messages.service';
 import { toMessageDto } from '../messages/message-response.mapper';
@@ -45,12 +46,17 @@ export class ChatGateway
   @WebSocketServer()
   server!: Server;
 
+  private readonly glpiUrl: string;
+
   constructor(
     private readonly chatAuthService: ChatAuthService,
     private readonly channelsService: ChannelsService,
     private readonly messagesService: MessagesService,
     private readonly presenceService: PresenceService,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.glpiUrl = configService.get<string>('GLPI_URL')!;
+  }
 
   afterInit(server: Server): void {
     server.use((socket, next) => {
@@ -127,7 +133,7 @@ export class ChatGateway
       return { error: result.error };
     }
 
-    const dto = toMessageDto(result.message);
+    const dto = toMessageDto(result.message, this.glpiUrl);
 
     socket
       .to(channelRoom(request.channelId))
@@ -162,7 +168,7 @@ export class ChatGateway
       parsed.data.messageId,
       parsed.data.content,
     );
-    const dto = toMessageDto(updated);
+    const dto = toMessageDto(updated, this.glpiUrl);
 
     this.server
       .to(channelRoom(dto.channelId))
@@ -193,7 +199,7 @@ export class ChatGateway
     const updated = await this.messagesService.softDelete(
       parsed.data.messageId,
     );
-    const dto = toMessageDto(updated);
+    const dto = toMessageDto(updated, this.glpiUrl);
 
     this.server
       .to(channelRoom(dto.channelId))
