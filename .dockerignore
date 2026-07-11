@@ -1,0 +1,17 @@
+**/node_modules
+.git
+**/dist
+**/build
+**/coverage
+.env
+.env.*.local
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+**/.vite
+k8s
+docker
+.github
+.vscode

@@ -159,3 +159,13 @@ jobs:
       - run: npm run test:e2e -w apps/api
 
       - run: npm run build --workspaces --if-present
+
+      # Build-only verification that the Dockerfiles stay correct over time -
+      # no push, no registry (registry choice is a follow-up decision, not
+      # made here). Dev-safe ARG defaults are enough for a correctness check;
+      # these tags aren't deployable artifacts.
+      - run: docker build -f apps/api/Dockerfile -t munichat-api:ci .
+
+      - run: docker build -f apps/api/Dockerfile --target build -t munichat-api:ci-migrator .
+
+      - run: docker build -f apps/web/Dockerfile -t munichat-web:ci .

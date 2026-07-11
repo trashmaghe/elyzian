@@ -1,0 +1,32 @@
+# One-shot migration runner - same `prisma migrate deploy` command as the
+# docker-compose `api-migrate` service, run through a Job instead. Uses the
+# `-migrator`-tagged image built from the api Dockerfile's `build` stage
+# (`docker build --target build`), since that's the only stage with the
+# prisma CLI on it.
+#
+# Job names are immutable: `kubectl delete job munichat-api-migrate -n
+# munichat` before re-applying this for a subsequent release.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: munichat-api-migrate
+  namespace: munichat
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: <REPLACE_WITH_REGISTRY>/munichat-api:<REPLACE_WITH_TAG>-migrator
+          command:
+            - node_modules/.bin/prisma
+            - migrate
+            - deploy
+            - --schema
+            - apps/api/prisma/schema.prisma
+          envFrom:
+            - configMapRef:
+                name: munichat-config
+            - secretRef:
+                name: munichat-secret
