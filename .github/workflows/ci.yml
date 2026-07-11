@@ -76,7 +76,6 @@ jobs:
       MINIO_ROOT_USER: test_minio_admin
       MINIO_ROOT_PASSWORD: test_minio_password
       MINIO_BUCKET: munichat-files
-      LINK_PREVIEW_ALLOW_PRIVATE_HOSTS: "true"
       GLPI_URL: http://localhost:8080
       GLPI_APP_TOKEN: test-glpi-app-token
       GLPI_USER_TOKEN: test-glpi-user-token
