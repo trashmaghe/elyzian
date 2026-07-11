@@ -1,0 +1,51 @@
+# No ConfigMap/Secret wiring needed - VITE_* values are baked into the static
+# bundle at image build time (see k8s/README.md for the build-arg tradeoff).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: munichat-web
+  namespace: munichat
+  labels:
+    app: munichat-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: munichat-web
+  template:
+    metadata:
+      labels:
+        app: munichat-web
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: web
+          image: <REPLACE_WITH_REGISTRY>/munichat-web:<REPLACE_WITH_TAG>
+          ports:
+            - containerPort: 80
+          # nginx serving prebuilt static files needs nothing deeper than a
+          # plain HTTP check.
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "25m"
+              memory: "32Mi"
+            limits:
+              cpu: "150m"
+              memory: "128Mi"

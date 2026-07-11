@@ -1,0 +1,63 @@
+# Subdomain-based routing, not path-prefix splitting: apps/api/src/main.ts
+# never calls setGlobalPrefix(), so API routes are genuinely unprefixed
+# (/health, not /api/health). Retrofitting a prefix at the ingress layer
+# would need either an app-code change or fragile rewrite rules that risk
+# breaking Socket.IO's own fixed /socket.io/ path.
+#
+# Replace REPLACE_ME.example.com with your real domain before applying.
+# TLS/cert-manager wiring is deliberately out of scope - add a `tls:` block
+# and the appropriate cert-manager annotation once you have a domain and
+# issuer configured.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: munichat-web
+  namespace: munichat
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: web.REPLACE_ME.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: munichat-web
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: munichat-api
+  namespace: munichat
+  annotations:
+    # WebSocket upgrade needs no special annotation - ingress-nginx handles
+    # it by default. Default 60s proxy timeouts are close enough to
+    # engine.io's ~25s ping interval to be a real risk for long-lived
+    # connections, so extend both here.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Sticky sessions: apps/web/src/lib/socket.ts doesn't force
+    # transports: ['websocket'], so the client uses Socket.IO's default
+    # (starts on HTTP long-polling, upgrades later). The Redis adapter
+    # synchronizes broadcasts after a connection is established - it does
+    # NOT provide a distributed session store for the polling handshake's
+    # several sequential HTTP requests, which must all land on the same pod.
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "MUNICHAT_INGRESS_AFFINITY"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.REPLACE_ME.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: munichat-api
+                port:
+                  number: 3000

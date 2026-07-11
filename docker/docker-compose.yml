@@ -91,6 +91,97 @@ services:
       timeout: 5s
       retries: 10
 
+  api-migrate:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+      target: build
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Container DNS name, not .env's localhost value (that one's for
+      # host-machine tools like `npm run prisma:migrate` run outside Docker).
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+    command: ["node_modules/.bin/prisma", "migrate", "deploy", "--schema", "apps/api/prisma/schema.prisma"]
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      openldap:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      api-migrate:
+        condition: service_completed_successfully
+    environment:
+      # Container DNS names for the four networked services, everything else
+      # passed through from .env as-is.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: ${MINIO_PORT}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      LDAP_URL: ldap://openldap:389
+      LDAP_BIND_DN: ${LDAP_BIND_DN}
+      LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD}
+      LDAP_BASE_DN: ${LDAP_BASE_DN}
+      LDAP_USER_SEARCH_BASE: ${LDAP_USER_SEARCH_BASE}
+      LDAP_GROUP_SEARCH_BASE: ${LDAP_GROUP_SEARCH_BASE}
+      LDAP_USERNAME_ATTRIBUTE: ${LDAP_USERNAME_ATTRIBUTE}
+      LDAP_UNIQUE_ID_ATTRIBUTE: ${LDAP_UNIQUE_ID_ATTRIBUTE}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL}
+      PORT: ${PORT}
+      NODE_ENV: production
+      # The web container's published host port, not its container DNS name -
+      # this is a browser-facing origin, used for the CORS allow-list.
+      WEB_ORIGIN: http://localhost:8080
+      GLPI_URL: ${GLPI_URL}
+      GLPI_APP_TOKEN: ${GLPI_APP_TOKEN}
+      GLPI_USER_TOKEN: ${GLPI_USER_TOKEN}
+      GLPI_WEBHOOK_SECRET: ${GLPI_WEBHOOK_SECRET}
+      GLPI_WEBHOOK_TICKET_ID_FIELD: ${GLPI_WEBHOOK_TICKET_ID_FIELD}
+    ports:
+      - "${PORT}:${PORT}"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        # These are consumed by the BROWSER on the host machine, not by
+        # another container - hence localhost:<published port>, not the
+        # container DNS name `api`. Easy to get backwards.
+        VITE_API_URL: http://localhost:${PORT}
+        VITE_WS_URL: ws://localhost:${PORT}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # Deliberately not 5173, so this and `npm run dev`'s Vite dev server
+      # can run side by side without a port clash.
+      - "8080:80"
+
 volumes:
   pg_data:
   redis_data:

@@ -1,0 +1,67 @@
+# Horizontal scaling is safe here because apps/api/src/chat/redis-io.adapter.ts
+# already wires @socket.io/redis-adapter: Socket.IO broadcasts are propagated
+# across instances via Redis pub/sub. Without that adapter already in place,
+# running more than 1 replica would silently break real-time delivery between
+# clients connected to different pods.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: munichat-api
+  namespace: munichat
+  labels:
+    app: munichat-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: munichat-api
+  template:
+    metadata:
+      labels:
+        app: munichat-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: api
+          image: <REPLACE_WITH_REGISTRY>/munichat-api:<REPLACE_WITH_TAG>
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: munichat-config
+            - secretRef:
+                name: munichat-secret
+          # Real Prisma -> Postgres ping (GET /health). Correct semantics for
+          # "stop routing traffic to this pod" - takes it out of the Service
+          # endpoints list without killing it.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Deliberately NOT httpGet /health: a transient DB blip would fail
+          # the readiness check too, and killing+restarting the pod wouldn't
+          # fix a downstream Postgres problem - it would just thrash while the
+          # identical check fails again immediately after restart. A plain
+          # TCP check on the app's own port only catches the process actually
+          # hanging/deadlocking, which is what liveness should catch.
+          livenessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Starting point only - not load-tested. Tune against real traffic
+          # before relying on these in production.
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "192Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
