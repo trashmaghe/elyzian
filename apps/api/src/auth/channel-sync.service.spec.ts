@@ -70,7 +70,9 @@ describe('ChannelSyncService', () => {
       { code: 'P2002', clientVersion: 'test' },
     );
     prisma.channel.upsert.mockRejectedValueOnce(conflict);
-    prisma.channel.findUniqueOrThrow.mockResolvedValueOnce({ id: 'channel-ti' });
+    prisma.channel.findUniqueOrThrow.mockResolvedValueOnce({
+      id: 'channel-ti',
+    });
 
     await service.syncChannelsForUser('user-1', [
       'cn=ti,ou=groups,dc=munichat,dc=local',

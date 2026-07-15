@@ -55,9 +55,7 @@ export class ChannelSyncService {
   // Upsert the AD-linked channel, tolerating a concurrent creator: if two logins
   // race to create the same adGroupDn, one wins and the other catches the unique
   // violation and re-reads the now-existing row instead of surfacing a 500.
-  private async ensureChannel(
-    dn: string,
-  ): Promise<{ id: string }> {
+  private async ensureChannel(dn: string): Promise<{ id: string }> {
     try {
       return await this.prisma.channel.upsert({
         where: { adGroupDn: dn },
