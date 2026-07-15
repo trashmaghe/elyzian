@@ -7,4 +7,5 @@ export * from './attachment.dto';
 export * from './link-preview.dto';
 export * from './ticket-ref.dto';
 export * from './message.dto';
+export * from './message-search.dto';
 export * from './socket-events.dto';
