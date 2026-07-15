@@ -138,4 +138,38 @@ describe('MessageItem', () => {
     await user.click(confirmButton as HTMLElement);
     expect(onDelete).toHaveBeenCalledWith('m1');
   });
+
+  it('hides the name/time header when grouped, but keeps actions reachable', () => {
+    render(
+      <MessageItem
+        message={buildMessage()}
+        isOwn={true}
+        isGrouped={true}
+        onReply={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText('Joao Silva')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Reply')).toBeInTheDocument();
+    expect(screen.getByLabelText('Edit')).toBeInTheDocument();
+    expect(screen.getByLabelText('Delete')).toBeInTheDocument();
+  });
+
+  it('renders reaction pills when reactions are provided', () => {
+    render(
+      <MessageItem
+        message={buildMessage()}
+        isOwn={false}
+        reactions={[{ emoji: '👍', count: 2 }]}
+        onReply={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('👍')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
 });
