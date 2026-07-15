@@ -32,8 +32,16 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <Card className="w-full max-w-sm">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 left-1/2 size-[30rem] -translate-x-1/2 -translate-y-[55%] rounded-full bg-[radial-gradient(circle,var(--accent)_0%,transparent_68%)] opacity-[0.16] blur-[6px]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-14 -right-20 h-[25rem] w-[22rem] rotate-[-6deg] bg-[linear-gradient(155deg,var(--gold),var(--accent))] opacity-10 [clip-path:polygon(50%_0%,100%_18%,100%_58%,50%_100%,0%_58%,0%_18%)]"
+      />
+      <Card className="relative z-10 w-full max-w-sm">
         <CardHeader>
           <CardTitle>Sign in to MuniChat</CardTitle>
         </CardHeader>
