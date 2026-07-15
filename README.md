@@ -33,17 +33,62 @@ A self-hosted, real-time chat platform for a municipal government — replacing 
 | Dev environment | Docker Compose |
 | Testing | Jest, Supertest, Vitest, React Testing Library |
 
-## Architecture (Phase 1)
+## Architecture
 
 ```mermaid
-flowchart LR
-  Web["React (Vite dev server)"] -->|HTTP| API["NestJS API"]
-  API --> Postgres[(PostgreSQL 16)]
-  API --> Redis[(Redis 7)]
-  API --> MinIO[(MinIO)]
+flowchart TB
+  subgraph client["Client"]
+    Web["React SPA (Vite)<br/>TanStack Query · Zustand"]
+  end
+
+  subgraph api["NestJS API (horizontally scalable)"]
+    REST["REST controllers<br/>auth · channels · messages · files · GLPI webhook"]
+    WS["Socket.IO gateway<br/>messages · typing · presence"]
+    Worker["BullMQ worker<br/>link-preview processor"]
+  end
+
+  subgraph data["Data services"]
+    Postgres[(PostgreSQL 16<br/>Prisma)]
+    Redis[(Redis 7<br/>sessions · presence · pub/sub · queue)]
+    MinIO[(MinIO<br/>S3 file storage)]
+  end
+
+  subgraph ext["External systems"]
+    AD[(Active Directory<br/>LDAPS)]
+    GLPI[(GLPI<br/>REST API)]
+  end
+
+  Web -->|"HTTP (httpOnly JWT cookies)"| REST
+  Web <-->|WebSocket| WS
+  Web -->|"presigned PUT (direct upload)"| MinIO
+
+  REST --> Postgres
+  REST -->|refresh tokens| Redis
+  REST -->|verify credentials + memberOf sync| AD
+  REST -->|create/fetch tickets| GLPI
+  REST -->|enqueue| Redis
+
+  WS --> Postgres
+  WS -->|presence + adapter fan-out| Redis
+
+  Worker -->|consume jobs| Redis
+  Worker -->|fetch Open Graph tags| Internet(("Internet"))
+  Worker --> Postgres
+
+  GLPI -.->|"webhook: ticket status"| REST
 ```
 
-See [docs/architecture.md](docs/architecture.md) for details, and for how this diagram grows in later phases.
+**How the pieces fit:**
+
+- **Web** — a single React SPA. Server state is cached with TanStack Query; live chat state lives in a small Zustand store. One Socket.IO connection is opened only after login. File uploads go **straight to MinIO** via presigned URLs — the API signs the URL and later validates the object, but never proxies the bytes.
+- **API** — one NestJS app exposing both REST controllers and a Socket.IO gateway. The gateway authenticates in the WebSocket handshake using the **same** access-token validator as the HTTP layer, so REST and realtime auth can't drift. It scales horizontally: `@socket.io/redis-adapter` fans `emit`s out across instances via Redis pub/sub.
+- **PostgreSQL** — the system of record (User, Channel, ChannelMember, Message, Attachment, LinkPreview, TicketRef, AuditLog) via Prisma, with keyset-paginated message history.
+- **Redis** — refresh-token store (rotation/revocation), online-presence counters + set, the Socket.IO adapter's pub/sub channel, and the BullMQ queue backend.
+- **BullMQ worker** — link previews are processed off the request path: sending a message with a URL enqueues a job; a worker fetches the page's Open Graph tags (behind an SSRF guard) and persists the preview.
+- **Active Directory (LDAPS)** — login binds against AD; department channels are provisioned from the user's `memberOf` groups on each login.
+- **GLPI** — `/ticket` in chat creates a helpdesk ticket over GLPI's REST API; an inbound, HMAC-signed webhook pushes ticket-status updates back into the channel in realtime.
+
+See [docs/architecture.md](docs/architecture.md) for the full write-up and [docs/estrutura-do-codigo.md](docs/estrutura-do-codigo.md) for a module-by-module walkthrough (pt-BR).
 
 ## Prerequisites
 
@@ -70,14 +115,16 @@ npm run dev                # starts packages/shared (watch), the API, and the we
 ```
 munichat/
 ├── apps/
-│   ├── api/          # NestJS backend
-│   └── web/          # React frontend
+│   ├── api/                # NestJS backend (REST + Socket.IO)
+│   │   ├── prisma/         # schema + migrations
+│   │   └── src/            # auth, channels, messages, chat, files,
+│   │                       #   link-preview, glpi, health, users, redis, queue
+│   └── web/                # React frontend (Vite SPA)
 ├── packages/
-│   └── shared/       # shared TS types (DTOs, socket event contracts)
-├── docker/
-│   └── docker-compose.yml
-├── docs/
-│   └── architecture.md
+│   └── shared/             # shared DTOs (Zod) + socket event contracts
+├── docker/                 # local dev services (postgres, redis, minio, openldap)
+├── k8s/                    # Kubernetes manifests (production)
+├── docs/                   # architecture + pt-BR docs
 └── README.md
 ```
 
@@ -104,7 +151,7 @@ Run `npm run test:e2e -w apps/api` for the API's end-to-end tests (requires the 
 - `apps/api` — Jest for unit tests (`npm run test -w apps/api`), Supertest-based e2e tests against a real Postgres instance (`npm run test:e2e -w apps/api`).
 - `apps/web` — Vitest + React Testing Library (`npm run test -w apps/web`).
 - `packages/shared` — Vitest for DTO/schema validation.
-- CI (`.github/workflows/ci.yml`) runs lint, typecheck, and tests on every push and pull request against `main`, using a real Postgres service container.
+- CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit + e2e tests, and Docker image builds on every pull request, using real Postgres, Redis, OpenLDAP, and MinIO service containers.
 
 ## Roadmap
 
