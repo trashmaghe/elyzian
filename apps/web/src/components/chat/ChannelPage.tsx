@@ -7,6 +7,7 @@ import { deleteMessage } from '@/lib/socket';
 import { MessageList } from '@/components/chat/MessageList';
 import { MessageComposer } from '@/components/chat/MessageComposer';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { PresenceCluster } from '@/components/chat/PresenceCluster';
 
 export function ChannelPage() {
   const { channelId } = useParams<{ channelId: string }>();
@@ -49,8 +50,9 @@ function ChannelPageBody({ channelId }: { channelId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="border-b px-4 py-3">
+      <header className="flex items-center justify-between border-b px-4 py-3">
         <h1 className="text-sm font-medium">{channel?.displayName ?? 'Channel'}</h1>
+        <PresenceCluster channelId={channelId} />
       </header>
       <MessageList
         channelId={channelId}

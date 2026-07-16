@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, BellOff } from 'lucide-react';
+import { Bell, BellOff, Moon, Sun } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { logout } from '@/lib/auth-api';
 import { useUIStore } from '@/stores/useUIStore';
@@ -10,6 +10,8 @@ export function UserMenu() {
   const queryClient = useQueryClient();
   const notificationsEnabled = useUIStore((state) => state.notificationsEnabled);
   const setNotificationsEnabled = useUIStore((state) => state.setNotificationsEnabled);
+  const theme = useUIStore((state) => state.theme);
+  const toggleTheme = useUIStore((state) => state.toggleTheme);
   const logoutMutation = useMutation({
     mutationFn: logout,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['currentUser'] }),
@@ -21,9 +23,7 @@ export function UserMenu() {
       return;
     }
     const permission =
-      Notification.permission === 'granted'
-        ? 'granted'
-        : await Notification.requestPermission();
+      Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
     if (permission === 'granted') {
       setNotificationsEnabled(true);
     }
@@ -44,6 +44,14 @@ export function UserMenu() {
             {notificationsEnabled ? <Bell /> : <BellOff />}
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+        >
+          {theme === 'dark' ? <Sun /> : <Moon />}
+        </Button>
         <Button
           variant="outline"
           size="sm"

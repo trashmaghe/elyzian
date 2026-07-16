@@ -2,10 +2,19 @@ import { useEffect, useRef } from 'react';
 import type { Message } from '@munichat/shared';
 import { useChannelMessages } from '@/hooks/useChannelMessages';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { computeMessageGrouping } from '@/lib/message-grouping';
 import { MessageItem } from '@/components/chat/MessageItem';
 import { Button } from '@/components/ui/button';
 
 const NEAR_BOTTOM_THRESHOLD_PX = 100;
+
+// Reactions have no backend yet (Phase 7 backlog) — these two demo pills, pinned
+// to the newest couple of messages, exist only to make the new UI visible.
+function getDemoReactions(index: number, total: number): { emoji: string; count: number }[] | undefined {
+  if (index === total - 1) return [{ emoji: '👍', count: 1 }, { emoji: '🎉', count: 1 }];
+  if (index === total - 3) return [{ emoji: '👀', count: 2 }];
+  return undefined;
+}
 
 export function MessageList({
   channelId,
@@ -24,6 +33,7 @@ export function MessageList({
   const wasNearBottomRef = useRef(true);
 
   const messages = data ? [...data.pages].reverse().flatMap((page) => page.messages) : [];
+  const groupingFlags = computeMessageGrouping(messages);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -56,11 +66,13 @@ export function MessageList({
         </div>
       )}
       {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading messages…</p>}
-      {messages.map((message) => (
+      {messages.map((message, index) => (
         <MessageItem
           key={message.id}
           message={message}
           isOwn={message.authorId === currentUser?.id}
+          isGrouped={groupingFlags[index] ?? false}
+          reactions={getDemoReactions(index, messages.length)}
           onReply={onReply}
           onEdit={onEdit}
           onDelete={onDelete}
