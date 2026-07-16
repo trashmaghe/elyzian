@@ -61,9 +61,7 @@ describe('RMM agents + remote control (e2e)', () => {
         return;
       }
 
-      const meshMatch = /^\/agents\/([^/]+)\/meshcentral\/$/.exec(
-        url.pathname,
-      );
+      const meshMatch = /^\/agents\/([^/]+)\/meshcentral\/$/.exec(url.pathname);
       if (meshMatch && req.method === 'GET') {
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(

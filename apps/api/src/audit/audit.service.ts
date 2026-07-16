@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface AuditLogInput {
   userId?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.InputJsonValue;
   ip?: string;
 }
 
@@ -27,7 +28,10 @@ export class AuditService {
         },
       });
     } catch (err) {
-      this.logger.error(`Failed to write audit log for action "${action}"`, err);
+      this.logger.error(
+        `Failed to write audit log for action "${action}"`,
+        err,
+      );
     }
   }
 }

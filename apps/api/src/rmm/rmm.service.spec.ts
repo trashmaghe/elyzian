@@ -134,9 +134,7 @@ describe('RmmService', () => {
         fileUrl: 'https://mesh.example.org/files?login=abc',
       });
       const [url, options] = fetchSpy.mock.calls[0] as [string, RequestInit];
-      expect(url).toBe(
-        'https://api.rmm.example.org/agents/a1/meshcentral/',
-      );
+      expect(url).toBe('https://api.rmm.example.org/agents/a1/meshcentral/');
       expect((options.headers as Record<string, string>)['X-API-KEY']).toBe(
         'test-api-key',
       );
@@ -145,9 +143,9 @@ describe('RmmService', () => {
     it('throws RmmUnavailableError on a non-ok response', async () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse(500, {}));
 
-      await expect(
-        service.getMeshControlUrls('a1'),
-      ).rejects.toBeInstanceOf(RmmUnavailableError);
+      await expect(service.getMeshControlUrls('a1')).rejects.toBeInstanceOf(
+        RmmUnavailableError,
+      );
     });
 
     it('throws RmmUnavailableError when the request fails or times out', async () => {
@@ -155,9 +153,9 @@ describe('RmmService', () => {
         new DOMException('The operation was aborted', 'TimeoutError'),
       );
 
-      await expect(
-        service.getMeshControlUrls('a1'),
-      ).rejects.toBeInstanceOf(RmmUnavailableError);
+      await expect(service.getMeshControlUrls('a1')).rejects.toBeInstanceOf(
+        RmmUnavailableError,
+      );
     });
   });
 });
