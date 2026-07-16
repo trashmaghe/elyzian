@@ -6,5 +6,6 @@ export * from './channel.dto';
 export * from './attachment.dto';
 export * from './link-preview.dto';
 export * from './ticket-ref.dto';
+export * from './rmm.dto';
 export * from './message.dto';
 export * from './socket-events.dto';

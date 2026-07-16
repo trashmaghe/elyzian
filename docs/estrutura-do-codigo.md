@@ -68,6 +68,7 @@ schemas.
 | `attachment.dto.ts` | Metadados de anexo e presign de upload |
 | `link-preview.dto.ts` | Pré-visualização de links (Open Graph) |
 | `ticket-ref.dto.ts` | Referência a um chamado GLPI |
+| `rmm.dto.ts` | Inventário de agentes e payload do webhook de alerta do Tactical RMM |
 | `socket-events.dto.ts` | **Contrato dos eventos WebSocket** (nomes e payloads) |
 | `health.dto.ts` | Resposta do health check |
 | `enums.ts` | Espelho dos enums do Prisma (ChannelType, MessageType, etc.) |
@@ -208,6 +209,23 @@ Comando de usuário: digitar `/ticket <descrição>` no chat cria um chamado no
 GLPI e posta um "card" de ticket no canal. Quando o status muda no GLPI, o
 webhook atualiza o card em tempo real via WebSocket.
 
+### `rmm/` — Integração com Tactical RMM (monitoramento/alertas)
+
+| Arquivo | Papel |
+|---|---|
+| `rmm.service.ts` | Cliente REST do Tactical RMM (autenticação `X-API-KEY`, sem sessão como o GLPI). `listAgents`/`getAgent`. |
+| `rmm.controller.ts` | `GET /rmm/agents` e `GET /rmm/agents/:agentId` — inventário de dispositivos monitorados, restrito a membros do canal de alertas configurado. |
+| `rmm-webhook.controller.ts` | Recebe o webhook de alerta do Tactical RMM (`POST /webhooks/rmm/alerts`), posta uma mensagem `SYSTEM` no canal configurado (ou abre um chamado GLPI reaproveitando o fluxo `/ticket` para alertas ≥ `RMM_AUTO_TICKET_SEVERITY`) e atualiza a mensagem quando o alerta é resolvido. Autenticado por **token estático via header `Authorization: Bearer`** (comparação de tempo constante) — o Tactical RMM não assina o corpo como o GLPI faz. |
+
+O corpo do webhook do Tactical RMM é um template JSON escrito à mão na UI de
+Alert Templates (variáveis `{{agent.hostname}}`, `{{alert.message}}` etc.);
+`packages/shared/src/rmm.dto.ts` define o contrato que esse template precisa
+produzir. As mensagens de alerta são de autoria de um usuário de sistema fixo
+(`rmm-bot`, semeado na migration `20260716140000_add_rmm_alert_ref_and_system_user`),
+e o rastreio de resolvido/não-resolvido usa `RmmAlertRef`, espelhando
+`TicketRef`. Este módulo é deliberadamente somente leitura/entrada — os
+endpoints de execução de script do Tactical RMM não são usados.
+
 ### `health/`, `redis/`, `queue/`, `users/`, `audit/`
 
 - `health/` — `GET /health`, faz um round-trip real Prisma → Postgres via
@@ -220,9 +238,9 @@ webhook atualiza o card em tempo real via WebSocket.
 
 ### `test/` — Testes end-to-end
 
-`auth`, `chat`, `glpi`, `health`, `rich-content` — testes Supertest rodando
-contra Postgres, Redis, LDAP e MinIO **reais** (não mocks), tanto localmente
-quanto no CI.
+`auth`, `chat`, `glpi`, `health`, `rich-content`, `rmm-webhook` — testes
+Supertest rodando contra Postgres, Redis, LDAP e MinIO **reais** (não mocks),
+tanto localmente quanto no CI.
 
 ---
 
