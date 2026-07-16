@@ -31,6 +31,14 @@ import { createBullConnection } from './queue/bullmq-connection';
         storage: new ThrottlerStorageRedisService(
           configService.get<string>('REDIS_URL'),
         ),
+        // The e2e suites share one source IP (127.0.0.1) and log the seeded
+        // users in far more than the /auth/login limit allows, so throttling
+        // them makes every suite 429. Skip throttling under Jest (NODE_ENV
+        // === 'test'); the rate-limit e2e spec opts back in for its own run by
+        // setting THROTTLE_DISABLED='false'. Production/dev are unaffected.
+        skipIf: () =>
+          process.env.NODE_ENV === 'test' &&
+          process.env.THROTTLE_DISABLED !== 'false',
       }),
     }),
     BullModule.forRoot({ connection: createBullConnection() }),

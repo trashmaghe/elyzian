@@ -19,6 +19,11 @@ describe('Rate limiting (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeAll(async () => {
+    // The global throttler skips itself under NODE_ENV==='test' so the other
+    // e2e suites (which share one IP and exceed the login limit) aren't 429'd.
+    // This suite is the one that actually exercises throttling, so opt back in.
+    process.env.THROTTLE_DISABLED = 'false';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -34,6 +39,9 @@ describe('Rate limiting (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+    // Restore the default so throttling stays skipped for any suite that runs
+    // after this one under --runInBand.
+    delete process.env.THROTTLE_DISABLED;
   });
 
   it('returns 429 on the 6th /auth/login attempt within a minute from the same IP', async () => {
