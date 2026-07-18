@@ -1,166 +1,163 @@
 <div align="center">
 
-<img src="docs/assets/brasao-pmns.png" width="120" alt="Brasão de Nova Serrana" />
+<img src="docs/assets/elyzian-mark.png" width="112" alt="Elyzian" />
 
 # Elyzian
 
-### Real-Time Municipal Chat Platform
+### Municipal Communications Platform
 
-*Powered by Prefeitura Municipal de Nova Serrana · MG*
+**Prefeitura Municipal de Nova Serrana · Minas Gerais**
 
-![versão](https://img.shields.io/badge/vers%C3%A3o-0.1.0-blue)
-![NestJS](https://img.shields.io/badge/NestJS-11-E0234E)
-![React](https://img.shields.io/badge/React-18-61DAFB)
-![licença](https://img.shields.io/badge/licen%C3%A7a-Proprietary-lightgrey)
+**English** · [Português](README.pt-br.md)
+
+<br />
+
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)
+![React](https://img.shields.io/badge/React_18-20232A?logo=react&logoColor=61DAFB)
+![NestJS](https://img.shields.io/badge/NestJS-E0234E?logo=nestjs&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
+![Tauri](https://img.shields.io/badge/Tauri-24C8DB?logo=tauri&logoColor=white)
+
+![Node.js](https://img.shields.io/badge/Node.js_20-5FA04E?logo=nodedotjs&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis_7-FF4438?logo=redis&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-2D3748?logo=prisma&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![Caddy](https://img.shields.io/badge/Caddy-1F88C0?logo=caddy&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-06B6D4?logo=tailwindcss&logoColor=white)
+![Socket.IO](https://img.shields.io/badge/Socket.IO-010101?logo=socketdotio&logoColor=white)
+
+![License](https://img.shields.io/badge/license-Proprietary-6a7167)
+![CI](https://github.com/trashmaghe/elyzian/actions/workflows/ci.yml/badge.svg)
 
 </div>
 
-A self-hosted, real-time chat platform for a municipal government — replacing WhatsApp/Spark with Active Directory authentication, department-based channels, and GLPI ticket creation from chat.
-
-**Status: Phases 1–6 complete.** Active Directory login, real-time chat (presence, typing, edit/delete/reply), file uploads, link previews, GLPI ticketing, full-text message search, Redis-backed rate limiting, browser notifications, and PWA installability are all working, and the app ships with production Docker images and Kubernetes manifests. See [Roadmap](#roadmap) for the precise breakdown.
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Backend | Node.js 20+, NestJS (TypeScript), Socket.IO |
-| Frontend | React 18 + TypeScript, Vite, TanStack Query, Zustand, Tailwind CSS, shadcn/ui |
-| Database | PostgreSQL 16 + Prisma ORM |
-| Cache / PubSub | Redis 7 |
-| File storage | MinIO (S3-compatible) |
-| Directory auth | Active Directory via LDAPS (`ldapts`) |
-| Ticketing | GLPI REST API |
-| Dev environment | Docker Compose |
-| Testing | Jest, Supertest, Vitest, React Testing Library |
+A self-hosted, real-time communications platform for a municipal government —
+replacing WhatsApp/Spark with **Active Directory** sign-in, department channels,
+inline media (images, PDF, video, and voice notes), **GLPI** ticketing, and
+**Tactical RMM** device alerts. It ships as a Dockerized stack, a native
+**Windows desktop client**, and a one-wizard **enterprise installer** that
+deploys the whole thing.
 
 ## Architecture
 
-```mermaid
-flowchart TB
-  subgraph client["Client"]
-    Web["React SPA (Vite)<br/>TanStack Query · Zustand"]
-  end
+<div align="center">
+  <img src="docs/assets/architecture.png" alt="How Elyzian fits together — clients, Caddy edge, web + API, data services, and GLPI/RMM integrations" width="100%" />
+</div>
 
-  subgraph api["NestJS API (horizontally scalable)"]
-    REST["REST controllers<br/>auth · channels · messages · files · GLPI webhook"]
-    WS["Socket.IO gateway<br/>messages · typing · presence"]
-    Worker["BullMQ worker<br/>link-preview processor"]
-  end
+**How the pieces fit**
 
-  subgraph data["Data services"]
-    Postgres[(PostgreSQL 16<br/>Prisma)]
-    Redis[(Redis 7<br/>sessions · presence · pub/sub · queue)]
-    MinIO[(MinIO<br/>S3 file storage)]
-  end
+- **Clients** — the browser/PWA, a native **desktop client** (Tauri + Rust, a
+  thin shell over the hosted web app that auto-updates), and the **enterprise
+  installer** that stands the stack up.
+- **Caddy edge** — terminates TLS with automatic Let's Encrypt certificates,
+  speaks HTTP/2 + HTTP/3, and reverse-proxies the app and API.
+- **Web** — a single React 18 SPA (Vite, TanStack Query, Zustand, Tailwind)
+  served by nginx. It reads its API origin at runtime, so one prebuilt image
+  serves any deployment. File uploads go **straight to MinIO** via presigned URLs.
+- **API** — one NestJS app exposing REST **and** a Socket.IO gateway that share
+  the same auth validator; a BullMQ worker handles link previews off the request
+  path. Scales horizontally via the Redis Socket.IO adapter.
+- **PostgreSQL** — the system of record (Prisma), with keyset-paginated history
+  and full-text search.
+- **Redis** — refresh-token store, presence, the Socket.IO pub/sub, and the job queue.
+- **MinIO** — S3-compatible storage for every attachment.
+- **OpenLDAP / Active Directory** — sign-in binds against the directory;
+  department channels are provisioned from each user's `memberOf` groups.
+- **GLPI / Tactical RMM** — `/ticket` opens helpdesk tickets and status flows
+  back via a signed webhook; RMM device alerts post into a channel.
 
-  subgraph ext["External systems"]
-    AD[(Active Directory<br/>LDAPS)]
-    GLPI[(GLPI<br/>REST API)]
-  end
+## Languages & stack
 
-  Web -->|"HTTP (httpOnly JWT cookies)"| REST
-  Web <-->|WebSocket| WS
-  Web -->|"presigned PUT (direct upload)"| MinIO
+| Area | Built with |
+|---|---|
+| **Languages** | TypeScript · Rust · SQL · Shell · CSS · HTML |
+| **Backend** | Node.js 20, NestJS, Socket.IO, BullMQ, Prisma |
+| **Frontend** | React 18, Vite, TanStack Query, Zustand, Tailwind CSS, shadcn/Base UI |
+| **Desktop** | Tauri 2 (Rust) — native Windows client + enterprise installer |
+| **Data** | PostgreSQL 16, Redis 7, MinIO (S3) |
+| **Directory** | Active Directory / OpenLDAP via `ldapts` |
+| **Integrations** | GLPI (ticketing), Tactical RMM (monitoring) |
+| **Edge / infra** | Docker Compose, Caddy (auto-TLS), Kubernetes manifests |
+| **Testing** | Jest, Supertest, Vitest, React Testing Library |
 
-  REST --> Postgres
-  REST -->|refresh tokens| Redis
-  REST -->|verify credentials + memberOf sync| AD
-  REST -->|create/fetch tickets| GLPI
-  REST -->|enqueue| Redis
+## Desktop software
 
-  WS --> Postgres
-  WS -->|presence + adapter fan-out| Redis
+Two native Windows apps built with Tauri (a few MB each, OS WebView — not
+Chromium), branded with the Elyzian asphodel:
 
-  Worker -->|consume jobs| Redis
-  Worker -->|fetch Open Graph tags| Internet(("Internet"))
-  Worker --> Postgres
+- **Elyzian** — the client. A first-run screen takes the server address, then the
+  window becomes the hosted app; it auto-updates itself.
+- **Elyzian Enterprise Installer** — a seven-step wizard that checks for Docker,
+  collects every credential/webhook, **downloads the app images**, and deploys
+  the stack with Compose — streaming logs and finishing with a health check.
 
-  GLPI -.->|"webhook: ticket status"| REST
-```
+Installers are built for **Windows 10+ on x64, x86 (32-bit) and ARM64**. Windows
+7 machines use the hosted app in a browser. See **[docs/desktop-apps.md](docs/desktop-apps.md)**.
 
-**How the pieces fit:**
-
-- **Web** — a single React SPA. Server state is cached with TanStack Query; live chat state lives in a small Zustand store. One Socket.IO connection is opened only after login. File uploads go **straight to MinIO** via presigned URLs — the API signs the URL and later validates the object, but never proxies the bytes.
-- **API** — one NestJS app exposing both REST controllers and a Socket.IO gateway. The gateway authenticates in the WebSocket handshake using the **same** access-token validator as the HTTP layer, so REST and realtime auth can't drift. It scales horizontally: `@socket.io/redis-adapter` fans `emit`s out across instances via Redis pub/sub.
-- **PostgreSQL** — the system of record (User, Channel, ChannelMember, Message, Attachment, LinkPreview, TicketRef, AuditLog) via Prisma, with keyset-paginated message history.
-- **Redis** — refresh-token store (rotation/revocation), online-presence counters + set, the Socket.IO adapter's pub/sub channel, and the BullMQ queue backend.
-- **BullMQ worker** — link previews are processed off the request path: sending a message with a URL enqueues a job; a worker fetches the page's Open Graph tags (behind an SSRF guard) and persists the preview.
-- **Active Directory (LDAPS)** — login binds against AD; department channels are provisioned from the user's `memberOf` groups on each login.
-- **GLPI** — `/ticket` in chat creates a helpdesk ticket over GLPI's REST API; an inbound, HMAC-signed webhook pushes ticket-status updates back into the channel in realtime.
-
-See [docs/architecture.md](docs/architecture.md) for the full write-up and [docs/estrutura-do-codigo.md](docs/estrutura-do-codigo.md) for a module-by-module walkthrough (pt-BR).
-
-## Prerequisites
-
-- Node.js 20+ (developed against v24)
-- npm 10+
-- Docker Desktop (or another Docker Compose-compatible engine)
-
-## Quick Start
+## Quick start (development)
 
 ```bash
 npm install
 cp .env.example .env
-npm run docker:up          # starts postgres, redis, minio
-npm run prisma:migrate     # applies the schema to postgres
-npm run dev                # starts packages/shared (watch), the API, and the web app
+npm run docker:up          # postgres, redis, minio, openldap
+npm run prisma:migrate     # apply the schema
+npm run dev                # shared (watch) + API + web
 ```
 
-- API: http://localhost:3000 (health check at `/health`)
-- Web: http://localhost:5173
-- MinIO console: http://localhost:9001
+- API — http://localhost:3000 (health at `/health`)
+- Web — http://localhost:5173
+- MinIO console — http://localhost:9001
 
-## Project Structure
+## Project structure
 
 ```
 elyzian/
 ├── apps/
-│   ├── api/                # NestJS backend (REST + Socket.IO)
-│   │   ├── prisma/         # schema + migrations
-│   │   └── src/            # auth, channels, messages, chat, files,
-│   │                       #   link-preview, glpi, health, users, redis, queue
-│   └── web/                # React frontend (Vite SPA)
+│   ├── api/                  # NestJS backend (REST + Socket.IO)
+│   ├── web/                  # React SPA (Vite)
+│   ├── desktop/              # Tauri desktop client
+│   └── enterprise-installer/ # Tauri deploy wizard
 ├── packages/
-│   └── shared/             # shared DTOs (Zod) + socket event contracts
-├── docker/                 # local dev services (postgres, redis, minio, openldap)
-├── k8s/                    # Kubernetes manifests (production)
-├── docs/                   # architecture + pt-BR docs
-└── README.md
+│   └── shared/               # shared Zod DTOs + socket contracts
+├── docker/                   # compose stacks (dev, images, edge) + configs
+├── k8s/                      # Kubernetes manifests
+└── docs/                     # architecture, desktop, deploy, pt-BR docs
 ```
 
-## Environment Variables
+## Documentation
 
-All configuration lives in a single root `.env` (copied from `.env.example`). Docker Compose, the NestJS `ConfigModule`, Vite, and the Prisma CLI (via `dotenv-cli`) all read from this one file — see `.env.example` for the current variable list.
+- **[docs/architecture.md](docs/architecture.md)** — full architecture write-up
+- **[docs/desktop-apps.md](docs/desktop-apps.md)** — the desktop client + enterprise installer
+- **[docs/deploy-edge.md](docs/deploy-edge.md)** — production Caddy + auto-TLS edge
+- **[docs/estrutura-do-codigo.md](docs/estrutura-do-codigo.md)** — module-by-module walkthrough (pt-BR)
 
-## Scripts (run from repo root)
+## Scripts (from repo root)
 
-| Script | Description |
+| Script | Does |
 |---|---|
-| `npm run dev` | Run `packages/shared` (watch), the API, and the web app concurrently |
-| `npm run build` | Build all workspaces |
-| `npm run lint` / `lint:fix` | Lint all workspaces |
-| `npm run typecheck` | Typecheck all workspaces |
-| `npm run test` | Run unit tests in all workspaces |
+| `npm run dev` | Run shared (watch) + API + web concurrently |
+| `npm run build` / `lint` / `typecheck` / `test` | Across all workspaces |
 | `npm run docker:up` / `docker:down` / `docker:logs` | Manage the local data services |
-| `npm run prisma:migrate` / `prisma:generate` / `prisma:studio` | Prisma CLI wrappers (via `dotenv-cli`) |
+| `npm run prisma:migrate` / `prisma:generate` / `prisma:studio` | Prisma CLI wrappers |
 
-Run `npm run test:e2e -w apps/api` for the API's end-to-end tests (requires the Docker data services to be running).
-
-## Testing
-
-- `apps/api` — Jest for unit tests (`npm run test -w apps/api`), Supertest-based e2e tests against a real Postgres instance (`npm run test:e2e -w apps/api`).
-- `apps/web` — Vitest + React Testing Library (`npm run test -w apps/web`).
-- `packages/shared` — Vitest for DTO/schema validation.
-- CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit + e2e tests, and Docker image builds on every pull request, using real Postgres, Redis, OpenLDAP, and MinIO service containers.
+`npm run test:e2e -w apps/api` runs the API's e2e tests (needs the Docker services up).
 
 ## Roadmap
 
-- [x] **Phase 1 — Foundation**: monorepo, Docker Compose data services, Prisma schema, NestJS health check, React skeleton, CI.
-- [x] **Phase 2 — Auth**: Active Directory (LDAPS) login, JWT sessions, channel sync from `memberOf`.
-- [x] **Phase 3 — Chat core**: Socket.IO gateway, message history, channels UI, presence, typing indicators.
-- [x] **Phase 4 — Rich content**: file uploads (MinIO), link previews, message edit/delete/reply.
-- [x] **Phase 5 — GLPI**: `/ticket` slash command, ticket cards, webhook-driven status updates.
-- [x] **Phase 6 — Polish**: production Docker images and Kubernetes manifests, Postgres full-text message search, Redis-backed request rate limiting, browser notifications, and PWA installability (offline app shell).
-- [ ] **Phase 7 — Future**: see [docs/ideias-futuras.md](docs/ideias-futuras.md) for candidate features (reactions, read receipts, DMs, admin panel, observability, and more).
+- [x] **Foundation** — monorepo, Docker services, Prisma schema, CI
+- [x] **Auth** — Active Directory (LDAPS) sign-in, JWT sessions, channel sync
+- [x] **Chat core** — Socket.IO, history, presence, typing indicators
+- [x] **Rich content** — uploads (MinIO), link previews, edit/delete/reply, inline media + voice notes, PDF preview
+- [x] **Integrations** — GLPI `/ticket` + webhooks, Tactical RMM alerts
+- [x] **Polish** — full-text search, rate limiting, notifications, PWA, unread badges
+- [x] **Brand & delivery** — the Elyzian asphodel identity, native desktop apps, self-deploying enterprise installer
+- [ ] **Next** — see [docs/ideias-futuras.md](docs/ideias-futuras.md)
 
-> **Note on this roadmap:** items are checked only when the corresponding code exists in this repository. Phases 4 and 5 were previously left unchecked here despite being merged (PRs #3 and #4) — verify PR merge state independently rather than trusting this checklist alone.
+<div align="center">
+<br />
+<img src="docs/assets/brasao-pmns.png" width="52" alt="Brasão de Nova Serrana" />
+<br />
+<sub>Built for the Prefeitura Municipal de Nova Serrana · MG</sub>
+</div>
