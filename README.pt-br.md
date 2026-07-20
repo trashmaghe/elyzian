@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/elyzian-mark.png" width="112" alt="Elyzian" />
+<img src="docs/assets/elyzian-mark.svg" width="116" alt="Elyzian" />
 
 # Elyzian
 
