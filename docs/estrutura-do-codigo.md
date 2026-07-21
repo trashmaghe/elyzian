@@ -444,9 +444,10 @@ nenhum (não é evento `fetch`), então não precisou de exclusão explícita.
 
 - `docker-compose.yml` — sobe Postgres, Redis, MinIO e OpenLDAP para
   desenvolvimento local.
-- `ldap/bootstrap.ldif` — dados iniciais do diretório LDAP (usuários, grupos).
-- `ldap/memberof-override.ldif` — reconfigura o *overlay* `memberOf` do OpenLDAP
-  para o schema `groupOfNames/member` (igual ao AD real).
+- `ldap/custom/50-bootstrap.ldif` — dados iniciais do diretório LDAP (usuários, grupos).
+- `ldap/custom/10-memberof-override.ldif` — reconfigura o *overlay* `memberOf` do
+  OpenLDAP para o schema `groupOfNames/member` (igual ao AD real). Prefixo numérico
+  garante a ordem de aplicação (overlay antes dos dados).
 
 ### `apps/api/Dockerfile` e `apps/web/Dockerfile`
 

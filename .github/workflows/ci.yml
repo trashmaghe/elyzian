@@ -137,10 +137,10 @@ jobs:
       # is computed at write time, so this must run first or the group
       # memberships added by ldapadd won't get backfilled.
       - run: |
-          ldapmodify -x -D "cn=admin,cn=config" -w "$LDAP_CONFIG_PASSWORD" -H "$LDAP_URL" -f docker/ldap/memberof-override.ldif
+          ldapmodify -x -D "cn=admin,cn=config" -w "$LDAP_CONFIG_PASSWORD" -H "$LDAP_URL" -f docker/ldap/custom/10-memberof-override.ldif
 
       - run: |
-          ldapadd -x -D "$LDAP_BIND_DN" -w "$LDAP_ADMIN_PASSWORD" -H "$LDAP_URL" -f docker/ldap/bootstrap.ldif
+          ldapadd -x -D "$LDAP_BIND_DN" -w "$LDAP_ADMIN_PASSWORD" -H "$LDAP_URL" -f docker/ldap/custom/50-bootstrap.ldif
 
       # Same reasoning as the LDAP seed step above: GitHub Actions service
       # containers can't mount local volumes, so unlike docker-compose's

@@ -55,6 +55,10 @@ COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build --chown=node:node /app/node_modules/@prisma/client ./node_modules/@prisma/client
 # The workspace symlink node_modules/@elyzian/shared has no dist/ until this.
+# package.json is required too - it's how Node's resolver finds "main"
+# (dist/index.js) when the symlink is followed; without it require()
+# fails with MODULE_NOT_FOUND even though dist/ is right there.
+COPY --from=build --chown=node:node /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=build --chown=node:node /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build --chown=node:node /app/apps/api/dist ./apps/api/dist
 COPY --from=build --chown=node:node /app/apps/api/prisma ./apps/api/prisma

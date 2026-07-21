@@ -83,13 +83,24 @@ services:
       LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD}
       LDAP_CONFIG_PASSWORD: ${LDAP_ADMIN_PASSWORD}
       LDAP_TLS: "false"
+      # The image copies seed ldifs from this internal path into its own
+      # bootstrap/ldif/custom dir on first start (see volumes below) - files
+      # are applied in name order, so 10- (memberOf overlay retarget) runs
+      # before 50- (actual seed data), since memberOf is computed at write time.
+      LDAP_SEED_INTERNAL_LDIF_PATH: /ldap-seed/.
     ports:
       - "${LDAP_PORT}:389"
     volumes:
       - ldap_data:/var/lib/ldap
       - ldap_config:/etc/ldap/slapd.d
-      - ./ldap/memberof-override.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/10-memberof-override.ldif:ro
-      - ./ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-bootstrap.ldif:ro
+      # Mounted to an internal seed path, not directly onto
+      # bootstrap/ldif/custom - the image's own bootstrap logic sed -i's and
+      # later rm -rf's that directory in place, and both operations fail
+      # with "Device or resource busy" against a bind-mounted path (file or
+      # whole directory alike, since it's the mount point itself). Seeding
+      # via LDAP_SEED_INTERNAL_LDIF_PATH copies these into a real, unmounted
+      # directory instead, which the image can freely rewrite/remove.
+      - ./ldap/custom:/ldap-seed
     healthcheck:
       test: ["CMD", "ldapsearch", "-x", "-H", "ldap://localhost", "-s", "base", "-b", "", "(objectclass=*)"]
       interval: 5s
