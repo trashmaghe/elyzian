@@ -133,10 +133,39 @@ fn emit_log(app: &tauri::AppHandle, stream: &str, line: &str) {
     );
 }
 
+/// Forward a child process pipe to the UI log line-by-line. Uses lossy UTF-8
+/// decoding (unlike `BufRead::lines()`, which yields `Err` and stops on the
+/// first invalid sequence) so a single malformed chunk can't silently
+/// truncate the rest of the captured output.
+fn stream_lines<R: std::io::Read>(pipe: R, app: &tauri::AppHandle, stream: &str) {
+    let mut reader = BufReader::new(pipe);
+    let mut buf = Vec::new();
+    loop {
+        buf.clear();
+        match reader.read_until(b'\n', &mut buf) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {
+                let line = String::from_utf8_lossy(&buf);
+                let trimmed = line.trim_end_matches(['\r', '\n']);
+                if !trimmed.is_empty() {
+                    emit_log(app, stream, trimmed);
+                }
+            }
+        }
+    }
+}
+
 /// Run one streaming `docker compose …` command from `dir`, forwarding output.
 /// Returns the process exit code.
 fn run_compose(app: &tauri::AppHandle, dir: &Path, extra: &[&str], use_edge: bool) -> Result<i32, String> {
-    let mut args: Vec<String> = vec!["compose".into(), "-f".into(), IMAGES_COMPOSE.into()];
+    // Compose v2's default progress renderer redraws a live TTY grid with
+    // spinner/box-drawing glyphs. Piped through a non-TTY (as here) that can
+    // still arrive as partial multi-byte UTF-8 chunks; combined with
+    // `.lines()` + `Result::ok` below (pre-fix), a single bad chunk silently
+    // truncated the rest of the captured output, hiding the real pull error
+    // behind the generic "Image download failed" fallback. Plain progress
+    // avoids the redraw entirely so output is regular newline-delimited text.
+    let mut args: Vec<String> = vec!["compose".into(), "--progress".into(), "plain".into(), "-f".into(), IMAGES_COMPOSE.into()];
     if use_edge {
         args.push("-f".into());
         args.push(EDGE_COMPOSE.into());
@@ -159,17 +188,13 @@ fn run_compose(app: &tauri::AppHandle, dir: &Path, extra: &[&str], use_edge: boo
     let app_out = app.clone();
     let out = std::thread::spawn(move || {
         if let Some(o) = stdout {
-            for line in BufReader::new(o).lines().map_while(Result::ok) {
-                emit_log(&app_out, "stdout", &line);
-            }
+            stream_lines(o, &app_out, "stdout");
         }
     });
     let app_err = app.clone();
     let err = std::thread::spawn(move || {
         if let Some(e) = stderr {
-            for line in BufReader::new(e).lines().map_while(Result::ok) {
-                emit_log(&app_err, "stderr", &line);
-            }
+            stream_lines(e, &app_err, "stderr");
         }
     });
 
